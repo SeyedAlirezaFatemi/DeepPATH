@@ -94,6 +94,7 @@ class TileWorker(Process):
                 if avg_bkg <= (self.bkg_threshold / 100.0):
                     print(f"Percent_masked: {percent_masked:.6f}, {self.roi_pc / 100.0:.6f}")
                     # If an Aperio selection was made, check if it is within the selected region.
+                    # If no xml is provided, percent_masked is 1
                     if percent_masked >= (self.roi_pc / 100.0):
                         tile.save(outfile, quality=self.quality)
                         if bool(save_masks):
@@ -236,9 +237,8 @@ class DeepZoomImageTiler:
                     # Check if image has been tiled before.
                     if not os.path.exists(tile_name):
                         # Workers will do the tiling.
-                        self.queue.put((self.associated, level, (col, row),
-                                        tile_name, self.format, tile_name_bw, percent_masked, self.save_masks,
-                                        tile_mask))
+                        self.queue.put((self.associated, level, (col, row), tile_name, self.format, tile_name_bw,
+                                        percent_masked, self.save_masks, tile_mask))
                     self.tile_done()
 
     def tile_done(self):
@@ -275,8 +275,7 @@ class DeepZoomImageTiler:
 
         return mask, xml_valid, img_fact
 
-    def xml_read(self, xmldir, Attribute_Name):
-
+    def xml_read(self, xml_dir, attribute_name):
         # Original size of the image
         ImgMaxSizeX_orig = float(self.dz.level_dimensions[-1][0])
         ImgMaxSizeY_orig = float(self.dz.level_dimensions[-1][1])
@@ -288,7 +287,7 @@ class DeepZoomImageTiler:
         print("Image info:")
         print(ImgMaxSizeX_orig, ImgMaxSizeY_orig, cols, rows)
         try:
-            xmlcontent = minidom.parse(xmldir)
+            xmlcontent = minidom.parse(xml_dir)
             xml_valid = True
         except:
             xml_valid = False
@@ -299,19 +298,19 @@ class DeepZoomImageTiler:
         xy_neg = {}
         labelIDs = xmlcontent.getElementsByTagName('Annotation')
         for labelID in labelIDs:
-            if (Attribute_Name == []) | (Attribute_Name == ''):
+            if (attribute_name == []) | (attribute_name == ''):
                 isLabelOK = True
             else:
                 try:
                     labeltag = labelID.getElementsByTagName('Attribute')[0]
-                    if (Attribute_Name == labeltag.attributes['Value'].value):
+                    if (attribute_name == labeltag.attributes['Value'].value):
                         # if (Attribute_Name==labeltag.attributes['Name'].value):
                         isLabelOK = True
                     else:
                         isLabelOK = False
                 except:
                     isLabelOK = False
-            if Attribute_Name == "non_selected_regions":
+            if attribute_name == "non_selected_regions":
                 isLabelOK = True
 
             if isLabelOK:
@@ -347,7 +346,7 @@ class DeepZoomImageTiler:
             ImageDraw.Draw(img, 'L').polygon(xy_a, outline=255, fill=0)
         mask = np.array(img)
         scipy.misc.toimage(mask).save(os.path.join(os.path.split(self.basename[:-1])[0], "mask_" + os.path.basename(
-            self.basename) + "_" + Attribute_Name + ".jpeg"))
+            self.basename) + "_" + attribute_name + ".jpeg"))
         return mask / 255.0, xml_valid, new_fact
 
 
